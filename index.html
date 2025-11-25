@@ -24,17 +24,18 @@
         height: 100%;
       }
 
-      #style-switcher {
+      /* Basemap switcher dialog (top-right) */
+      #basemap-dialog {
         position: absolute;
         top: 10px;
-        left: 10px;
-        z-index: 1;
+        right: 10px;
+        z-index: 3;
         background: white;
         padding: 6px 10px;
         border-radius: 4px;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
           sans-serif;
-        font-size: 14px;
+        font-size: 13px;
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
       }
 
@@ -51,6 +52,7 @@
           sans-serif;
         font-size: 13px;
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+        min-width: 190px;
       }
 
       #layer-legend h3 {
@@ -59,38 +61,114 @@
         font-weight: 600;
       }
 
+      #layer-legend h4 {
+        margin: 6px 0 4px 0;
+        font-size: 12px;
+        font-weight: 600;
+        border-top: 1px solid #e5e7eb;
+        padding-top: 4px;
+      }
+
       #layer-legend label {
         display: flex;
         align-items: center;
         gap: 4px;
       }
+
     </style>
   </head>
   <body>
+    <div id="basemap-dialog">
+      <strong style="font-size: 12px; display: block; margin-bottom: 4px;">Basemap</strong>
+      <select id="basemap-select" style="width: 100%; font-size: 13px; min-width: 180px;">
+        <option value="osm" selected>OpenStreetMap</option>
+        <option value="os-transport">Ordnance Survey (UK only)</option>
+      </select>
+    </div>
+
     <div id="layer-legend">
-      <h3>Layers</h3>
+      <h3>Overlays</h3>
 
+      <h4>UK Crime</h4>
+      <label>
+        <input
+          type="checkbox"
+          id="toggle-uk-crime"
+          checked
+        />
+        UK Street-level Crime
+        <button
+          type="button"
+          id="flyto-uk-crime"
+          style="margin-left: auto; font-size: 12px; padding: 0 4px; border: none; background: none; cursor: pointer;"
+        >
+          🔍
+        </button>
+      </label>
+
+      <div style="font-size: 11px; margin: 4px 0 6px 18px; line-height: 1.4;">
+        <div><span style="display:inline-block;width:10px;height:10px;background:#dc2626;border-radius:50%;margin-right:4px;"></span>Violent crime</div>
+        <div><span style="display:inline-block;width:10px;height:10px;background:#f97316;border-radius:50%;margin-right:4px;"></span>Burglary</div>
+        <div><span style="display:inline-block;width:10px;height:10px;background:#2563eb;border-radius:50%;margin-right:4px;"></span>Vehicle crime</div>
+        <div><span style="display:inline-block;width:10px;height:10px;background:#10b981;border-radius:50%;margin-right:4px;"></span>Drugs</div>
+        <div><span style="display:inline-block;width:10px;height:10px;background:#22c55e;border-radius:50%;margin-right:4px;"></span>Anti-social behaviour</div>
+        <div><span style="display:inline-block;width:10px;height:10px;background:#4b5563;border-radius:50%;margin-right:4px;"></span>Other</div>
+      </div>
+
+      <h4>San Francisco</h4>
       <!-- SF incidents -->
-      <label>
+<label>
+  <input
+    type="checkbox"
+    id="toggle-incidents"
+    checked
+  />
+  SF Police Incidents
+  <button
+    type="button"
+    id="flyto-sf"
+    style="margin-left: auto; font-size: 12px; padding: 0 4px; border: none; background: none; cursor: pointer;"
+  >
+    🔍
+  </button>
+</label>
+
+      <div style="font-size: 11px; margin: 4px 0 6px 18px; line-height: 1.4;">
+        <div><span style="display:inline-block;width:10px;height:10px;background:#2563eb;border-radius:50%;margin-right:4px;"></span>Larceny theft</div>
+        <div><span style="display:inline-block;width:10px;height:10px;background:#f97316;border-radius:50%;margin-right:4px;"></span>Burglary</div>
+        <div><span style="display:inline-block;width:10px;height:10px;background:#dc2626;border-radius:50%;margin-right:4px;"></span>Robbery / assault</div>
+        <div><span style="display:inline-block;width:10px;height:10px;background:#10b981;border-radius:50%;margin-right:4px;"></span>Drugs</div>
+        <div><span style="display:inline-block;width:10px;height:10px;background:#4b5563;border-radius:50%;margin-right:4px;"></span>Other</div>
+      </div>
+
+      <label style="font-size: 11px; margin-left: 18px;">
         <input
           type="checkbox"
-          id="toggle-incidents"
-          checked
+          id="toggle-incidents-heatmap"
         />
-        SF Police Incidents
+        Show as heatmap
       </label>
 
-      <!-- Contra Costa Law/EMS/Fire zones -->
-      <hr style="margin: 6px 0;" />
+      <!-- Camden County, NJ Law/EMS/Fire zones -->
 
-      <label>
-        <input
-          type="checkbox"
-          id="toggle-law"
-          checked
-        />
-        CCC Law Zones
-      </label>
+      <h4>Camden County, NJ</h4>
+
+<label>
+  <input
+    type="checkbox"
+    id="toggle-law"
+    checked
+  />
+  <span style="display:inline-block;width:10px;height:10px;background:#aec7e8;border-radius:2px;margin-right:4px;"></span>
+  CCC Law Zones
+  <button
+    type="button"
+    id="flyto-camden"
+    style="margin-left: auto; font-size: 12px; padding: 0 4px; border: none; background: none; cursor: pointer;"
+  >
+    🔍
+  </button>
+</label>
       <input
         type="range"
         id="opacity-law"
@@ -107,6 +185,7 @@
           id="toggle-ems"
           checked
         />
+        <span style="display:inline-block;width:10px;height:10px;background:#ffbb78;border-radius:2px;margin-right:4px;"></span>
         CCC EMS Zones
       </label>
       <input
@@ -125,6 +204,7 @@
           id="toggle-fire"
           checked
         />
+        <span style="display:inline-block;width:10px;height:10px;background:#98df8a;border-radius:2px;margin-right:4px;"></span>
         CCC Fire Zones
       </label>
       <input
@@ -136,6 +216,8 @@
         value="0.5"
         style="width: 100%;"
       />
+
+      
     </div>
 
     <div id="map"></div>
