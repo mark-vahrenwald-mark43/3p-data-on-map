@@ -28,17 +28,60 @@ const OSM_RASTER_STYLE = {
 const INITIAL_CENTER = [-122.4194, 37.7749]; // SF by default
 const INITIAL_ZOOM = 12;
 
+function lngLatToWebMercator(lng, lat) {
+  const R = 6378137;
+  const x = (lng * Math.PI) / 180 * R;
+  const y =
+    Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360)) * R;
+  return { x, y };
+}
+
 const map = new maplibregl.Map({
   container: "map",
   // Use the local OS Transport style as the single base style
   style: "./transport.txt",
   center: INITIAL_CENTER,
   zoom: INITIAL_ZOOM,
-  maxZoom: 15
+  maxZoom: 19
 });
 
 // Add zoom/rotation controls
 map.addControl(new maplibregl.NavigationControl(), "top-right");
+
+class ZoomLevelControl {
+  constructor() {
+    this._container = null;
+  }
+
+  onAdd(mapInstance) {
+    this._map = mapInstance;
+    const div = document.createElement("div");
+    div.className = "zoom-level-ctrl";
+    div.textContent = `Zoom: ${mapInstance.getZoom().toFixed(1)}`;
+
+    this._update = () => {
+      div.textContent = `Zoom: ${this._map.getZoom().toFixed(1)}`;
+    };
+
+    mapInstance.on("zoom", this._update);
+    this._container = div;
+    return div;
+  }
+
+  onRemove() {
+    if (this._map && this._update) {
+      this._map.off("zoom", this._update);
+    }
+    if (this._container && this._container.parentNode) {
+      this._container.parentNode.removeChild(this._container);
+    }
+    this._map = undefined;
+    this._container = undefined;
+    this._update = undefined;
+  }
+}
+
+map.addControl(new ZoomLevelControl(), "bottom-left");
 
 function addCustomLayers() {
   if (!map.getSource("incidents")) {
@@ -152,6 +195,39 @@ function addCustomLayers() {
       }
     };
   }
+
+  map.off("click", "concord-addresses-layer");
+  map.on("click", "concord-addresses-layer", (e) => {
+    const feature = e.features && e.features[0];
+    if (!feature) return;
+
+    const coords = feature.geometry && feature.geometry.coordinates;
+    const props = feature.properties || {};
+    const fullAddr = props.Concord_FullAddr || props["Concord_FullAddr"];
+
+    let html = "";
+    if (fullAddr !== undefined && fullAddr !== null && fullAddr !== "") {
+      html += `${fullAddr}`;
+    } else {
+      html += "(No Concord_FullAddr attribute available)";
+    }
+
+    if (coords && coords.length === 2) {
+      new maplibregl.Popup()
+        .setLngLat(coords)
+        .setHTML(html)
+        .addTo(map);
+    }
+  });
+
+  map.off("mouseenter", "concord-addresses-layer");
+  map.off("mouseleave", "concord-addresses-layer");
+  map.on("mouseenter", "concord-addresses-layer", () => {
+    map.getCanvas().style.cursor = "pointer";
+  });
+  map.on("mouseleave", "concord-addresses-layer", () => {
+    map.getCanvas().style.cursor = "";
+  });
 
   const incidentsHeatmapToggle = document.getElementById("toggle-incidents-heatmap");
   if (incidentsHeatmapToggle) {
@@ -300,6 +376,103 @@ function addCustomLayers() {
     }
   });
 
+  const concordToggle = document.getElementById("toggle-concord-dispatch");
+
+  if (concordToggle) {
+    concordToggle.onchange = (e) => {
+      const visible = e.target.checked;
+      if (!visible) {
+        if (map.getLayer("concord-dispatch-layer")) {
+          map.setLayoutProperty("concord-dispatch-layer", "visibility", "none");
+        }
+        return;
+      }
+      refreshConcordRaster();
+    };
+  }
+  if (!map.getSource("concord-addresses")) {
+    map.addSource("concord-addresses", {
+      type: "geojson",
+      data: { type: "FeatureCollection", features: [] }
+    });
+  }
+
+  if (!map.getLayer("concord-addresses-layer")) {
+    map.addLayer({
+      id: "concord-addresses-layer",
+      type: "circle",
+      source: "concord-addresses",
+      paint: {
+        "circle-radius": 3,
+        "circle-color": "#2563eb",
+        "circle-opacity": 0.8,
+        "circle-stroke-width": 0.5,
+        "circle-stroke-color": "#ffffff"
+      }
+    });
+  }
+
+  if (!map.getLayer("concord-addresses-label")) {
+    map.addLayer({
+      id: "concord-addresses-label",
+      type: "symbol",
+      source: "concord-addresses",
+      minzoom: 17,
+      layout: {
+        "text-field": "TEST",
+        "text-size": 14,
+        "text-offset": [0, 1.2],
+        "text-allow-overlap": true
+      },
+      paint: {
+        "text-color": "#000000",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 1
+      }
+    });
+  }
+
+  const addressesToggle = document.getElementById("toggle-concord-addresses");
+  const initialVisibility = addressesToggle && addressesToggle.checked
+    ? "visible"
+    : "none";
+  map.setLayoutProperty("concord-addresses-layer", "visibility", initialVisibility);
+  if (map.getLayer("concord-addresses-label")) {
+    map.setLayoutProperty("concord-addresses-label", "visibility", initialVisibility);
+  }
+
+  const concordAddressesToggle = document.getElementById(
+    "toggle-concord-addresses"
+  );
+  if (concordAddressesToggle) {
+    concordAddressesToggle.onchange = (e) => {
+      const visibility = e.target.checked ? "visible" : "none";
+      if (map.getLayer("concord-addresses-layer")) {
+        map.setLayoutProperty(
+          "concord-addresses-layer",
+          "visibility",
+          visibility
+        );
+      }
+      if (map.getLayer("concord-addresses-label")) {
+        map.setLayoutProperty(
+          "concord-addresses-label",
+          "visibility",
+          visibility
+        );
+      }
+
+      if (e.target.checked) {
+        fetchConcordAddressesForView();
+      } else if (map.getSource("concord-addresses")) {
+        map.getSource("concord-addresses").setData({
+          type: "FeatureCollection",
+          features: []
+        });
+      }
+    };
+  }
+
   const flyToSfBtn = document.getElementById("flyto-sf");
   if (flyToSfBtn) {
     flyToSfBtn.onclick = () => {
@@ -316,6 +489,16 @@ function addCustomLayers() {
       map.flyTo({
         center: [-75.05, 39.8],
         zoom: 10
+      });
+    };
+  }
+
+  const flyToConcordBtn = document.getElementById("flyto-concord");
+  if (flyToConcordBtn) {
+    flyToConcordBtn.onclick = () => {
+      map.flyTo({
+        center: [-122.031, 37.978],
+        zoom: 17
       });
     };
   }
@@ -449,6 +632,13 @@ map.on("load", () => {
   addCustomLayers();
   fetchUkCrimeForView();
 
+  fetchConcordAddressesForView();
+
+  const concordToggleOnLoad = document.getElementById("toggle-concord-dispatch");
+  if (concordToggleOnLoad && concordToggleOnLoad.checked) {
+    refreshConcordRaster();
+  }
+
   // Ensure initial basemap visibility matches the selector
   updateBasemapVisibility();
 });
@@ -457,10 +647,12 @@ map.on("styledata", () => {
   if (map.isStyleLoaded()) {
     addCustomLayers();
     fetchUkCrimeForView();
+    fetchConcordAddressesForView();
   }
 });
 
 let ukCrimeAbortController = null;
+let concordAddressesAbortController = null;
 
 function fetchUkCrimeForView() {
   const toggle = document.getElementById("toggle-uk-crime");
@@ -531,7 +723,136 @@ function fetchUkCrimeForView() {
 
 map.on("moveend", () => {
   fetchUkCrimeForView();
+
+  const concordToggle = document.getElementById("toggle-concord-dispatch");
+  if (concordToggle && concordToggle.checked) {
+    refreshConcordRaster();
+  }
+
+  fetchConcordAddressesForView();
 });
+
+function fetchConcordAddressesForView() {
+  const toggle = document.getElementById("toggle-concord-addresses");
+  if (!toggle || !toggle.checked) {
+    if (map.getSource("concord-addresses")) {
+      map.getSource("concord-addresses").setData({
+        type: "FeatureCollection",
+        features: []
+      });
+    }
+    return;
+  }
+
+  if (!map.getSource("concord-addresses")) {
+    return;
+  }
+
+  const bounds = map.getBounds();
+  const sw = bounds.getSouthWest();
+  const ne = bounds.getNorthEast();
+
+  const geometry = {
+    xmin: sw.lng,
+    ymin: sw.lat,
+    xmax: ne.lng,
+    ymax: ne.lat,
+    spatialReference: { wkid: 4326 }
+  };
+
+  const baseUrl =
+    "https://gis.cityofconcord.org/gsrv1/rest/services/BaseMap/MapServer/22/query";
+  const params = new URLSearchParams({
+    where: "1=1",
+    geometry: JSON.stringify(geometry),
+    geometryType: "esriGeometryEnvelope",
+    inSR: "4326",
+    spatialRel: "esriSpatialRelIntersects",
+    outFields: "*",
+    returnGeometry: "true",
+    outSR: "4326",
+    f: "geojson"
+  });
+
+  if (concordAddressesAbortController) {
+    concordAddressesAbortController.abort();
+  }
+  concordAddressesAbortController = new AbortController();
+
+  fetch(`${baseUrl}?${params.toString()}`, {
+    signal: concordAddressesAbortController.signal
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      if (map.getSource("concord-addresses")) {
+        map.getSource("concord-addresses").setData(
+          data || { type: "FeatureCollection", features: [] }
+        );
+      }
+    })
+    .catch((err) => {
+      if (err.name !== "AbortError") {
+        console.error("Error fetching Concord address points", err);
+      }
+    });
+}
+
+function refreshConcordRaster() {
+  const concordToggle = document.getElementById("toggle-concord-dispatch");
+  if (!concordToggle || !concordToggle.checked) {
+    return;
+  }
+  const opacity = 0.7;
+
+  const bounds = map.getBounds();
+  const sw = bounds.getSouthWest();
+  const ne = bounds.getNorthEast();
+
+  const width = map.getContainer().clientWidth || 1024;
+  const height = map.getContainer().clientHeight || 768;
+
+  const swM = lngLatToWebMercator(sw.lng, sw.lat);
+  const neM = lngLatToWebMercator(ne.lng, ne.lat);
+  const bbox = `${swM.x},${swM.y},${neM.x},${neM.y}`;
+
+  const exportUrl =
+    "https://gis.cityofconcord.org/gsrv1/rest/services/Police/DispatchLabels/MapServer/export" +
+    `?bbox=${encodeURIComponent(bbox)}` +
+    "&bboxSR=102100&imageSR=102100" +
+    `&size=${width},${height}` +
+    "&format=png32&transparent=true&f=image";
+
+  if (map.getLayer("concord-dispatch-layer")) {
+    map.removeLayer("concord-dispatch-layer");
+  }
+  if (map.getSource("concord-dispatch")) {
+    map.removeSource("concord-dispatch");
+  }
+
+  const coordinates = [
+    [sw.lng, ne.lat],
+    [ne.lng, ne.lat],
+    [ne.lng, sw.lat],
+    [sw.lng, sw.lat]
+  ];
+
+  map.addSource("concord-dispatch", {
+    type: "image",
+    url: exportUrl,
+    coordinates
+  });
+
+  map.addLayer({
+    id: "concord-dispatch-layer",
+    type: "raster",
+    source: "concord-dispatch",
+    paint: {
+      "raster-opacity": opacity
+    }
+  });
+
+  map.moveLayer("concord-dispatch-layer");
+}
 
 function updateBasemapVisibility() {
   const basemapSelectEl = document.getElementById("basemap-select");
@@ -567,7 +888,8 @@ function updateBasemapVisibility() {
         "law-fill",
         "ems-fill",
         "fire-fill",
-        "uk-crime-layer"
+        "uk-crime-layer",
+        "concord-dispatch-layer"
       ];
       const beforeId = overlayOrder.find((id) => map.getLayer(id));
       if (beforeId) {

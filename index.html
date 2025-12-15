@@ -75,6 +75,26 @@
         gap: 4px;
       }
 
+      .maplibregl-ctrl-top-right {
+        top: 60px; /* move zoom controls down to avoid basemap picker overlap */
+      }
+
+      .zoom-level-ctrl {
+        background: white;
+        padding: 4px 6px;
+        margin-top: 4px;
+        border-radius: 4px;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        font-size: 11px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+      }
+
+      .maplibregl-ctrl-bottom-left {
+        left: 10px;
+        bottom: 10px;
+      }
+
     </style>
   </head>
   <body>
@@ -141,7 +161,7 @@
         <div><span style="display:inline-block;width:10px;height:10px;background:#4b5563;border-radius:50%;margin-right:4px;"></span>Other</div>
       </div>
 
-      <label style="font-size: 11px; margin-left: 18px;">
+      <label style="font-size: 11px;">
         <input
           type="checkbox"
           id="toggle-incidents-heatmap"
@@ -216,7 +236,32 @@
         value="0.5"
         style="width: 100%;"
       />
+      
 
+      <h4>Concord, CA</h4>
+      <label>
+        <input
+          type="checkbox"
+          id="toggle-concord-dispatch"
+          checked
+        />
+        Concord Dispatch Labels
+        <button
+          type="button"
+          id="flyto-concord"
+          style="margin-left: auto; font-size: 12px; padding: 0 4px; border: none; background: none; cursor: pointer;"
+        >
+          🔍
+        </button>
+      </label>
+      <label style="font-size: 12px; display: block; margin-top: 4px;">
+        <input
+          type="checkbox"
+          id="toggle-concord-addresses"
+          checked
+        />
+        Concord Address Points
+      </label>
       
     </div>
 
